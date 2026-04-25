@@ -91,6 +91,48 @@ define
 
     %% Return a string representation of the secret
     fun {Decode Blockchain}
+
+        %% Subfunction 1: Splits digits characters into pairs of integer
+        fun {DigitPairs Digits}
+            case Digits
+            of D1|D2|T then
+                {String.toInt [D1 D2]} | {DigitPairs T}
+            
+            else
+                nil
+            end
+        end
+
+        %%Subfunction 2: conversion of pairs to letters and space
+        fun {NumToChar N}
+            if N == 36 then &\s 
+            
+            else &a + (N-10)
+
+            end
+        end
+
+        %%Subfunction 3: decode whole block 
+        fun {DecodeBlock Block}
+            {Map {DigitPairs {Int.toString Block.hash}} %%makes the list with duo digits
+            fun {$ X}
+                local M = X mod 37 in %%applies the rule of the thing
+                    {NumToChar if M < 10 then 36 else M end} %%numtochar that was done above on each double digit with map
+                end      
+            end}
+        end
+    
+    in
+        %%Last step: append all blocks together
+        {FoldL Blockchain 
+            fun{$ Acc Block} {Append Acc {DecodeBlock Block}} end
+            ""}
+    end
+
+
+
+
+
         %% STUDENT START:
         %% TODO
         %% STUDENT END
