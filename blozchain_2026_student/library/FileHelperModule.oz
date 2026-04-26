@@ -9,6 +9,14 @@ export
     writeLineInFile:WriteLineInFile
     writeLineLnInFile:WriteLineLnInFile
 define 
+    fun {StripTrailingCR S}
+        case {List.reverse S}
+        of nil then S
+        [] &\r|T then {List.reverse T}
+        else S
+        end
+    end
+
     % Read a file with one transaction per line and 
     % return a list of transactions parsed as records
     fun {ReadTransactionsFromFile FilePath}
@@ -24,13 +32,13 @@ define
 
             fun {ParseTransaction Fields}
                 % Fields format: block_number,nonce,hash,sender,receiver,value,max_effort
-                BlockNumber = Fields.1
-                Nonce = Fields.2.1
-                Hash = Fields.2.2.1
-                Sender = Fields.2.2.2.1
-                Receiver = Fields.2.2.2.2.1
-                Value = Fields.2.2.2.2.2.1
-                MaxEffort = Fields.2.2.2.2.2.2.1
+                BlockNumber = {StripTrailingCR Fields.1}
+                Nonce = {StripTrailingCR Fields.2.1}
+                Hash = {StripTrailingCR Fields.2.2.1}
+                Sender = {StripTrailingCR Fields.2.2.2.1}
+                Receiver = {StripTrailingCR Fields.2.2.2.2.1}
+                Value = {StripTrailingCR Fields.2.2.2.2.2.1}
+                MaxEffort = {StripTrailingCR Fields.2.2.2.2.2.2.1}
             in
                 if {Not {String.isInt BlockNumber}} then
                     ErrorMessage = "Value Error: '" # BlockNumber # "' is not a valid integer representation of a block number field. (Parse transactions)"
@@ -117,8 +125,8 @@ define
         % genesis(address1:balance1 address2:balance2 ... addressN:balanceN)
         fun {ParseGenesis Lines}
             fun {ParseGenesisFields Fields}
-                User = Fields.1
-                Balance = Fields.2.1
+                User = {StripTrailingCR Fields.1}
+                Balance = {StripTrailingCR Fields.2.1}
             in
                 if {Not {String.isInt User}} then
                     ErrorMessage = "Value Error: '" # User # "' is not a valid integer representation of a user field. (Parse genesis block)"
