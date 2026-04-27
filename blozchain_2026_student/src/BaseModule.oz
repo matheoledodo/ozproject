@@ -45,7 +45,7 @@ define
             Sender = {CondSelect State Transaction.sender none}
         in
             Sender \= none
-            andthen Sender.balance >= Transaction.value
+            andthen Sender.balance >= (Transaction.value + {Effort Transaction}) %%EXTENSION 2: here we just add the effort for the transaction
             andthen Transaction.nonce == Sender.nonce + 1
         end
     in
@@ -119,7 +119,7 @@ define
 
     fun {ApplyTransaction State Tx}
         Sender = {CondSelect State Tx.sender none}
-        NewSender = user(balance:Sender.balance - Tx.value nonce:Sender.nonce + 1)
+        NewSender = user(balance:Sender.balance - (Tx.value+Tx.effort) nonce:Sender.nonce + 1) %%EXTENSION 2: you now also substract the effort
         StateAfterSender = {AdjoinAt State Tx.sender NewSender}
     in
         {CreditReceiver StateAfterSender Tx}
@@ -144,15 +144,53 @@ define
         end
     end
 
-    fun {ExecuteBlockchainRec Transactions StateAcc ChainAcc PrevBlock CurrBlockNo CurrTxs CurrTmpState}
+    fun {ExecuteBlockchainRec 
+        Transactions
+        StateAcc ChainAcc PrevBlock 
+        CurrBlockNo CurrTxs CurrTmpState 
+        BlockCounter Denylist}
         case Transactions of nil then
             {FinalizeCurrentBlock StateAcc ChainAcc PrevBlock CurrTxs CurrTmpState}
         [] Tx|Rest then
             if Tx.block_number \= CurrBlockNo then
                 NewCommittedState#NewChainAcc#NewPrevBlock = {FinalizeCurrentBlock StateAcc ChainAcc PrevBlock CurrTxs CurrTmpState}
             in
-                {ExecuteBlockchainRec Transactions NewCommittedState NewChainAcc NewPrevBlock Tx.block_number nil NewCommittedState}
+                {ExecuteBlockchainRec Transactions NewCommittedState NewChainAcc NewPrevBlock Tx.block_number nil NewCommittedState record() Denylist}
             else
+                
+            local
+                Sender
+                OldCount
+                NewCount
+                NewBlockCounter
+                NewDenylist
+            in
+
+
+                %%Extension1: denylist step 1. Count senders in the current block
+                Sender=Tx.sender
+                OldCount= {CondSelect BlockCounter Sender 0}
+                NewCount= OldCount+1
+                NewBlockCounter= {AdjoinAt BlockCounter Sender NewCount}
+
+                %%Extension1: denylist step 2. Add in denylist if sender has reached 3txs
+ 
+                if NewCount >3 then
+                    NewDenylist = {AdjoinAt Denylist Sender unit}
+                else
+                    NewDenylist =  Denylist
+                end
+
+                %%Extension1: denylist step3. If sender is in denylist, we ignore him
+                
+                if {CondSelect NewDenylist Sender false} \= false then
+
+                    {ExecuteBlockchainRec Rest StateAcc ChainAcc PrevBlock CurrBlockNo CurrTxs CurrTmpState NewBlockCounter NewDenylist}
+
+
+
+
+                else 
                 TxEffort = {Effort Tx}
                 EnrichedTx = tx(
                     block_number:Tx.block_number
@@ -169,13 +207,16 @@ define
                     NewCurrTxs = EnrichedTx|CurrTxs
                     NewCurrTmpState = {ApplyTransaction CurrTmpState EnrichedTx}
                 in
-                    {ExecuteBlockchainRec Rest StateAcc ChainAcc PrevBlock CurrBlockNo NewCurrTxs NewCurrTmpState}
+                    {ExecuteBlockchainRec Rest StateAcc ChainAcc PrevBlock CurrBlockNo NewCurrTxs NewCurrTmpState NewBlockCounter NewDenylist}
+
                 else
-                    {ExecuteBlockchainRec Rest StateAcc ChainAcc PrevBlock CurrBlockNo CurrTxs CurrTmpState}
+                    {ExecuteBlockchainRec Rest StateAcc ChainAcc PrevBlock CurrBlockNo CurrTxs CurrTmpState NewBlockCounter NewDenylist}
                 end
             end
         end
     end
+end
+end
         
 
 
@@ -228,7 +269,7 @@ define
         InitBlockNo = case Transactions of nil then 0 [] Tx|_ then Tx.block_number end
         FinalChainRev
     in
-        FinalState#FinalChainRev#_ = {ExecuteBlockchainRec Transactions StateAcc nil none InitBlockNo nil StateAcc}
+        FinalState#FinalChainRev#_ = {ExecuteBlockchainRec Transactions StateAcc nil none InitBlockNo nil StateAcc record() record() } % the last 2 records are for blockcounter and denylist
         FinalBlockchain = {List.reverse FinalChainRev}
     end
 end
