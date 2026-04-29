@@ -45,7 +45,7 @@ define
             Sender = {CondSelect State Transaction.sender none}
         in
             Sender \= none
-            andthen Sender.balance >= (Transaction.value + {Effort Transaction}) %%EXTENSION 2: here we just add the effort for the transaction
+            andthen Sender.balance >= Transaction.value
             andthen Transaction.nonce == Sender.nonce + 1
         end
     in
@@ -119,7 +119,7 @@ define
 
     fun {ApplyTransaction State Tx}
         Sender = {CondSelect State Tx.sender none}
-        NewSender = user(balance:Sender.balance - (Tx.value+Tx.effort) nonce:Sender.nonce + 1) %%EXTENSION 2: you now also substract the effort
+        NewSender = user(balance:Sender.balance - Tx.value nonce:Sender.nonce + 1)
         StateAfterSender = {AdjoinAt State Tx.sender NewSender}
     in
         {CreditReceiver StateAfterSender Tx}
@@ -175,7 +175,7 @@ define
 
                 %%Extension1: denylist step 2. Add in denylist if sender has reached 3txs
  
-                if NewCount >3 then
+                if NewCount >=3 then
                     NewDenylist = {AdjoinAt Denylist Sender unit}
                 else
                     NewDenylist =  Denylist
