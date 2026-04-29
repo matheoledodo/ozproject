@@ -45,7 +45,7 @@ define
             Sender = {CondSelect State Transaction.sender none}
         in
             Sender \= none
-            andthen Sender.balance >= Transaction.value
+            andthen Sender.balance >= (Transaction.value + {Effort Transaction}) %%EXTENSION 2: here we just add the effort for the transaction
             andthen Transaction.nonce == Sender.nonce + 1
         end
     in
@@ -119,7 +119,7 @@ define
 
     fun {ApplyTransaction State Tx}
         Sender = {CondSelect State Tx.sender none}
-        NewSender = user(balance:Sender.balance - Tx.value nonce:Sender.nonce + 1)
+        NewSender = user(balance:Sender.balance - (Tx.value+Tx.effort) nonce:Sender.nonce + 1) %%EXTENSION 2: you now also substract the effort
         StateAfterSender = {AdjoinAt State Tx.sender NewSender}
     in
         {CreditReceiver StateAfterSender Tx}
