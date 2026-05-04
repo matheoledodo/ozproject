@@ -5,21 +5,25 @@ export
 define
 
     %% STUDENT START:
-    
+
+    %% Hash a transaction from its main fields.
     fun {HachageTransactionHash Transaction}
         (Transaction.nonce + Transaction.sender + Transaction.receiver + Transaction.value) mod 1000000
     end
 
+    %% Hash a block from its number, previous hash and transactions.
     fun {HachageBlockHash Bloc}
         (Bloc.number + Bloc.previousHash + {SumTransitionsHash Bloc.transactions}) mod 1000000
     end
 
+    %% Sum the hash of every transaction in a block.
     fun {SumTransitionsHash Bloctransitions}
         case Bloctransitions of nil then 0
         [] H|T then {HachageTransactionHash H} + {SumTransitionsHash T}
         end
     end
 
+    %% Compute the effort required by a transaction based on the number of digits in its value.
     fun {Effort Transaction}
         fun {Pow2 N}
             if N == 0 then 1 else 2 * {Pow2 N-1} end
@@ -29,6 +33,7 @@ define
         {Pow2 X} - 1
     end
 
+    %% Check that a transaction is valid both structurally and against the current state.
     fun {ValidationTransaction Transaction State}
         fun {ValidationTransactionBasic Transaction}
             ComputedEffort = {Effort Transaction}
@@ -53,6 +58,7 @@ define
         andthen {ValidationTransactionWithState Transaction State}
     end
 
+    %% Check that a block is valid with respect to the previous block and the current temporary state.
     fun {ValidationBloc Block PreviousBlock State}
         fun {SumEffort Transactions Accumulator}
             case Transactions of nil then Accumulator
@@ -78,6 +84,7 @@ define
     end
 
     %% The helper function for ExectutionBlockChain
+    %% Build the initial state from the genesis record.
     fun {StateFromGeniesis Genesis}
         fun {Build Users Acc}
             case Users of nil then Acc
@@ -93,8 +100,8 @@ define
     end
 
     %% add Tx.value to receiver balance
-    %% if receiver is missing, create it with balance:0 nonce:0 before crediting
-
+    %% Add the transaction value to the receiver balance.
+    %% If the receiver does not exist yet, create it first.
     fun {CreditReceiver State Tx}
         ReceiverId = Tx.receiver
         ReceiverInfo = {CondSelect State ReceiverId none}
@@ -117,6 +124,7 @@ define
         end
     end
 
+    %% Apply a transaction by debiting the sender and crediting the receiver.
     fun {ApplyTransaction State Tx}
         Sender = {CondSelect State Tx.sender none}
         NewSender = user(balance:Sender.balance - Tx.value nonce:Sender.nonce + 1)
@@ -125,6 +133,7 @@ define
         {CreditReceiver StateAfterSender Tx}
     end
 
+    %% Close the current block and decide whether it can be committed.
     fun {FinalizeCurrentBlock StateAcc ChainAcc PrevBlock CurrTxs CurrTmpState}
         if CurrTxs == nil then
             StateAcc#ChainAcc#PrevBlock
@@ -144,6 +153,7 @@ define
         end
     end
 
+    %% Process transactions one by one and build the chain state incrementally.
     fun {ExecuteBlockchainRec Transactions StateAcc ChainAcc PrevBlock CurrBlockNo CurrTxs CurrTmpState}
         case Transactions of nil then
             {FinalizeCurrentBlock StateAcc ChainAcc PrevBlock CurrTxs CurrTmpState}
@@ -183,7 +193,7 @@ define
     %% Return a string representation of the secret
     fun {Decode Blockchain}
 
-        %% Subfunction 1: Splits digits characters into pairs of integer
+        %% Split the digits of a hash into pairs of integers.
         fun {DigitPairs Digits}
             case Digits
             of D1|D2|T then
@@ -194,14 +204,14 @@ define
             end
         end
 
-        %%Subfunction 2: conversion of pairs to letters and space
+        %% Convert a number to a character: 10-35 map to letters, 36 maps to space.
         fun {NumToChar N}
             if N == 36 then 32
             else &a + (N-10)
             end
         end
 
-        %%Subfunction 3: decode whole block 
+        %% Decode a single block hash into characters.
         fun {DecodeBlock Block}
             {Map {DigitPairs {Int.toString Block.hash}}
              fun {$ X}
@@ -212,7 +222,7 @@ define
         end
     
     in
-        %%Last step: append all blocks together
+        %% Concatenate the decoded content of all blocks.
         {FoldL Blockchain 
             fun{$ Acc Block} {Append Acc {DecodeBlock Block}} end
             ""}
